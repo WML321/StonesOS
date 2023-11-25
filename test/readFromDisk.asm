@@ -110,5 +110,3 @@ setDisk:
   pop ebx
   pop eax
   ret
-
-

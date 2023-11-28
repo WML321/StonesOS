@@ -1,65 +1,119 @@
-; 使用LBA方式读取硬盘数据
-; 从硬盘中读数据需要用到dx, al 和立即数
+%include "boot.inc"
+SECTION MBR vstart=0x7c00
+  mov ax,cs
+  mov ds,ax
+  mov es,ax
+  mov ss,ax
+  mov fs,ax
+  mov sp,0x7c00
+  mov ax,0xb800
+  mov gs,ax
 
-; 设置扇区数，LBA28，表示一个扇区需要用28位来表示，而一个端口是8位
-; 所以需要4个端口，从0x1f3到0x1f6，多出来的4的位有其他用户，当作一种标志
-; 先设置读的扇区数量，相关端口是0x1f2
-; 然后就是设置LBA号
-; 设置起始LBA号存在DS:SI中
+  mov ax,0x600
+  mov bx,0x700
+  mov cx,0
+  mov dx,0x1010
+  int 0x10
 
-; 扇区数量
-readFromDisk:
-    push ax
-    push bx
-    push cx
-    push dx
+  mov byte [gs:0x00],'A'
+  mov byte [gs:0x01],0xA4
 
-    mov dx, 0x1f2
-    mov al, 1
-    out dx, al
+  mov byte [gs:0x02],'n'
+  mov byte [gs:0x03],0x13
 
-    ; 其实LBA号
-    inc dx ; 自增1，就是0x1f3了
-    mov eax, [si]
-    out dx, al
+  mov byte [gs:0x04],'t'
+  mov byte [gs:0x05],0x52
 
-    inc dx ; 0x1f4
-    mov al, ah
-    out dx, al
+  mov byte [gs:0x06],'z'
+  mov byte [gs:0x07],0xB1
 
-    shr eax, 16
+  mov byte [gs:0x08],' '
+  mov byte [gs:0x09],0xCC
 
-    inc dx ; 0x1f5
-    out dx, al
+  mov byte [gs:0x0A],'U'
+  mov byte [gs:0x0B],0x2B
 
-    inc dx ; 0x1f6
-    mov al, 0xe0
-    or al, ah
-    out dx, al
+  mov byte [gs:0x0C],'h'
+  mov byte [gs:0x0D],0x6D
 
-    ; 发送读硬盘指令
-    inc dx
-    mov al, 0x20
-    out dx, al
+  mov byte [gs:0x0E],'l'
+  mov byte [gs:0x0F],0x7E
 
-    ; 等待硬盘操作完成
-    .waits
-        in al, dx ; 读完成后，dx代表的端口中是有数据的，这个数据中有标志位
-        and al, 0x88
-        cmp al, 0x08
-        jnz .waits
+  mov byte [gs:0x10],' '
+  mov byte [gs:0x11],0x49
 
-    ; 读数据
-    ; 设置读取数量
-    mov cx, 256
-    mov dx, 0x1f0 ; 读和写每次都是两个字节
-    .read
-        in ax, dx
-        mov [si], ax
-        add si, 2
-        loop .read
-    pop dx
-    pop cx
-    pop bx
-    pop ax
-    ret
+  mov byte [gs:0x12],'K'
+  mov byte [gs:0x13],0xE5
+
+  mov byte [gs:0x14],'o'
+  mov byte [gs:0x15],0x8A
+
+  mov byte [gs:0x16],'n'
+  mov byte [gs:0x17],0x96
+
+  mov byte [gs:0x18],'e'
+  mov byte [gs:0x19],0x68
+
+  mov eax,LOADER_START_SECTOR
+  mov bx,LOADER_BASE_ADDR
+  mov cx,1
+  call rd_disk_m_16
+
+  jmp LOADER_BASE_ADDR
+
+rd_disk_m_16:
+
+  mov esi,eax
+  mov di,cx
+  mov dx,0x1f2
+  mov al,cl
+  out dx,al
+
+  mov eax,esi
+
+  mov dx,0x1f3
+  out dx,al
+
+  mov cl,8
+  shr eax,cl
+  mov dx,0x1f4
+  out dx,al
+
+  shr eax,cl
+  mov dx,0x1f5
+  out dx,al
+
+  shr eax,cl
+  and al,0x0f
+  or al,0xe0
+  mov dx,0x1f6
+  out dx,al
+
+  mov dx,0x1f7
+  mov al,0x20
+  out dx,al
+
+not_ready:
+  nop
+  in al,dx
+  and al,0x88
+
+  cmp al,0x08
+  jnz not_ready
+
+  mov ax,di
+  mov dx,256
+  mul dx
+  mov cx,ax
+
+  mov dx,0x1f0
+
+go_on_read:
+  in ax,dx
+  mov [bx],ax
+  add bx,2
+  loop go_on_read
+  ret
+
+  times 510-($-$$) db 0
+  db 0x55,0xaa
